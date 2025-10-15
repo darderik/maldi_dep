@@ -1,0 +1,23 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"editor.formatOnSave": true,
+		"files.autoSave": "afterDelay",
+		"editor.defaultFormatter": "ms-python.autopep8",
+		"mypy-type-checker.reportingScope": "workspace",
+		"editor.defaultFoldingRangeProvider": "ms-python.autopep8",
+		"autopep8.args": [
+			"--aggressive",
+			"--max-line-length=120",
+			"--ignore=E402",
+			"--exclude=venv",
+		],
+		"[python]": {
+			"editor.defaultFormatter": "ms-python.autopep8"
+		},
+	}
+}

@@ -1,0 +1,28 @@
+{
+    "nozzle_temperature": 100.0,
+    "bed_temperature": 55.0,
+    "bed_size": 200.0,
+    "z_height": 10.0,
+    "speed": 10.0,
+    "grid_step": 1.0,
+    "spray_function": "gaussian",
+    "spray_radius_vs_z": [
+        [
+            30.0,
+            20.0,
+            10.0,
+            5.0,
+            70.0,
+            40.0
+        ],
+        [
+            4.0,
+            3.0,
+            2.0,
+            1.0,
+            8.0,
+            5.0
+        ]
+    ],
+    "samples": []
+}
