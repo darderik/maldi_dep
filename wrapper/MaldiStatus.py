@@ -28,7 +28,6 @@ class MaldiStatus:
         self.bed_mesh: Optional[BedMesh] = None
         self.samples: List[SampleAggregator] = []
         self.initialized = True
-        self.optimizer = None
         self.gcode_creator: Optional[GCodeCreator] = None
     def refresh_bed_mesh(self) -> None:
         self.bed_mesh = BedMesh(
@@ -36,6 +35,7 @@ class MaldiStatus:
             grid_step_mm=Config().get("grid_step"),
             spray_function=self.gaussian_function
         )
+        self.samples = []  # Clear existing samples when refreshing bed mesh
 
     def add_sample(self, bl_corner: Tuple[float, float], x_size: Optional[float] = None, y_size: Optional[float] = None, verbose: bool = False) -> None:
         if self.bed_mesh is None:

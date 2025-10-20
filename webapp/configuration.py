@@ -58,5 +58,8 @@ with col_btn1:
         config.set("passes", int(passes))
         st.success("✅ Configuration updated successfully!")
         st.session_state.ms.refresh_bed_mesh()
+        st.session_state.best_strides = None
+        
+
 
 
