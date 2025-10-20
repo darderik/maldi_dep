@@ -23,7 +23,18 @@ if st.button("📝 Generate G-Code", type="primary", use_container_width=True):
         try:
             with st.spinner("🔄 Generating G-Code..."):
                 file_path = ms.generate_gcode(output_file)
+                time_estimate = ms.estimate_gcode_time()
             st.success(f"✅ G-Code generated and saved to {file_path}")
+            
+            # Display time estimate
+            col_time1, col_time2, col_time3 = st.columns(3)
+            with col_time1:
+                st.metric("⏱️ Estimated Total Time", time_estimate['formatted'])
+            with col_time2:
+                st.metric("🚀 Movement Time", f"{time_estimate['movement_seconds']:.1f}s")
+            with col_time3:
+                st.metric("🔥 Heating Time", f"{time_estimate['heating_seconds']:.1f}s")
+            
             with open(file_path, "r") as f:
                 gcode_content = f.read()
             st.download_button("⬇️ Download G-Code", gcode_content, file_name=output_file, mime="text/plain")
@@ -48,7 +59,18 @@ if st.button("📝 Generate from Specific Stride", use_container_width=True):
         try:
             with st.spinner("🔄 Generating G-Code..."):
                 file_path = ms.gcode_from_specific_stride(specific_stride, specific_file)
+                time_estimate = ms.estimate_gcode_time()
             st.success(f"✅ G-Code generated and saved to {file_path}")
+            
+            # Display time estimate
+            col_time1, col_time2, col_time3 = st.columns(3)
+            with col_time1:
+                st.metric("⏱️ Estimated Total Time", time_estimate['formatted'])
+            with col_time2:
+                st.metric("🚀 Movement Time", f"{time_estimate['movement_seconds']:.1f}s")
+            with col_time3:
+                st.metric("🔥 Heating Time", f"{time_estimate['heating_seconds']:.1f}s")
+            
             with open(file_path, "r") as f:
                 gcode_content = f.read()
             st.download_button("⬇️ Download G-Code", gcode_content, file_name=specific_file, key="download_specific", mime="text/plain")

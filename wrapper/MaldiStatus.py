@@ -29,7 +29,7 @@ class MaldiStatus:
         self.samples: List[SampleAggregator] = []
         self.initialized = True
         self.optimizer = None
-
+        self.gcode_creator: Optional[GCodeCreator] = None
     def refresh_bed_mesh(self) -> None:
         self.bed_mesh = BedMesh(
             size_mm=Config().get("bed_size_mm"),
@@ -208,19 +208,33 @@ class MaldiStatus:
         bed_temp = Config().get("bed_temperature")
         nozzle_temp = Config().get("nozzle_temperature")
 
-        gcode_creator = GCodeCreator(
+        self.gcode_creator = GCodeCreator(
             data=gcode_packed,
             z_height=z_height,
             bed_temp=bed_temp,
             nozzle_temp=nozzle_temp
         )
-        resulting_gcode = gcode_creator.generate_gcode()
+        resulting_gcode = self.gcode_creator.generate_gcode()
         
         # Save to file
         with open(output_file, "w") as f:
             f.write(resulting_gcode)
         
         return output_file
+
+    def estimate_gcode_time(self) -> dict:
+        """
+        Estimate print time for a G-code file.
+        
+        Args:
+            gcode_file: Path to the G-code file
+            
+        Returns:
+            Dictionary with time estimates
+        """
+        if self.gcode_creator is None:
+            raise ValueError("GCodeCreator not initialized.")
+        return self.gcode_creator.estimate_print_time()         
 
     def simulate_manual_stride(self, stride: float, return_fig: bool = False) -> Optional[Any]:
         """
