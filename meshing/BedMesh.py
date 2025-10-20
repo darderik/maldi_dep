@@ -6,14 +6,13 @@ import scipy.interpolate as interp
 from functools import singledispatch
 from .utils import boolean_function
 import matplotlib
-matplotlib.use('Agg')  # Ensure non-interactive backend
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from scipy.ndimage import label as ndimage_label, find_objects
 
 
 class BedMesh:
-    def __init__(self, size_mm: float, grid_step_mm: float, spray_function: Callable = None):
+    def __init__(self, size_mm: float, grid_step_mm: float, spray_function: Optional[Callable] = None):
         """
         Initialize the BedMesh object.
 
@@ -52,7 +51,7 @@ class BedMesh:
         result = interpolator([x, y])
         return result
 
-    def add_bool_mask(self, points: List[List[float]], shape: str = "rectangle", ):
+    def add_bool_mask(self, points: List[List[float]], shape: str = "rectangle", ) :
         """
         Add a boolean mask to the bed mesh.
 
@@ -63,24 +62,23 @@ class BedMesh:
         Raises:
             ValueError: If the shape is not recognized.
         """
-        from .Mask import Mask
+        from .Mask import SampleMask
         if shape == "rectangle":
             points_arr = np.array(points)
             for sample in points_arr:
                 corner1 = (sample[0], sample[2])
                 x_size = sample[1] - sample[0]
                 y_size = sample[3] - sample[2]
-                mask = Mask(
+                mask = SampleMask(
                     size_mm=self.size_mm,
                     grid_step_mm=self.grid_step_mm,
-                    function=boolean_function,
-                    kind="bool",
-                    corner1=(sample[0], sample[2]),
+                    bl_corner=corner1,
                     x_size=x_size,
-                    y_size=y_size
+                    y_size=y_size,
                 )
                 mask.apply(self, apply_position=(0, 0), mask_anchor=(0, 0))
                 self._bool_masks.append(mask)
+                return mask
                 
         else:
             raise ValueError(f"Unknown shape: {shape}")  # TODO More shapes

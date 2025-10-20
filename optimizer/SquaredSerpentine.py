@@ -19,7 +19,7 @@ class SquaredSerpentine:
         self.margin: float = margin
         self.x_amnt = x_amnt
         self.stride = stride
-        self.serpentines: List[Movement] = []
+        self.movements: List[Movement] = []
         self.passes = passes
         self.speed = speed
         self.max_speed = max_speed
@@ -48,96 +48,106 @@ class SquaredSerpentine:
         The serpentine movement zone is the mask bounding box expanded by `margin` in all directions,
         then clamped to the overall bed extents [0, size_mm].
         """
-        self.serpentines = []
-        if "bool" in self.mask.kind:
-            additional_args = self.mask.specific_args
-            # Mask Data (bounding box in mm)
-            corner1: NDArray = Array(additional_args["corner1"])  # (x_min, y_min)
-            x_size: float = additional_args["x_size"]
-            y_size: float = additional_args["y_size"]
-            x_min = float(corner1[0])
-            y_min = float(corner1[1])
-            x_max = x_min + x_size
-            y_max = y_min + y_size
+        self.movements = []
+        # Retrieve mask bbox from SampleMask attributes if available
+        bl_corner = getattr(self.mask, 'bl_corner', None)
+        x_size_attr = getattr(self.mask, 'x_size', None)
+        y_size_attr = getattr(self.mask, 'y_size', None)
+        if bl_corner is None or x_size_attr is None or y_size_attr is None:
+            # Cannot compute without bbox information
+            return
+        # Mask Data (bounding box in mm)
+        corner1: NDArray = Array(bl_corner)  # (x_min, y_min)
+        x_size: float = float(x_size_attr)
+        y_size: float = float(y_size_attr)
+        x_min = float(corner1[0])
+        y_min = float(corner1[1])
+        x_max = x_min + x_size
+        y_max = y_min + y_size
 
-            # Expand bbox by margin (sprayer movement area) and clamp to bed only
-            bm_size = getattr(self.bm, "size_mm", None)
-            x_left = x_min - self.margin
-            x_right = x_max + self.margin
-            y_bottom = y_min - self.margin
-            y_top = y_max + self.margin
+        # Expand bbox by margin (sprayer movement area) and clamp to bed only
+        bm_size = getattr(self.bm, "size_mm", None)
+        x_left = x_min - self.margin
+        x_right = x_max + self.margin
+        y_bottom = y_min - self.margin
+        y_top = y_max + self.margin
 
-            if bm_size is not None:
-                x_left = max(0.0, x_left)
-                y_bottom = max(0.0, y_bottom)
-                x_right = min(bm_size, x_right)
-                y_top = min(bm_size, y_top)
+        if bm_size is not None:
+            x_left = max(0.0, x_left)
+            y_bottom = max(0.0, y_bottom)
+            x_right = min(bm_size, x_right)
+            y_top = min(bm_size, y_top)
 
-            # If the expanded-and-clamped interval collapses, fall back to bbox clamped to bed
-            x_min_c = max(0.0, x_min) if bm_size is not None else x_min
-            y_min_c = max(0.0, y_min) if bm_size is not None else y_min
-            x_max_c = min(bm_size, x_max) if bm_size is not None else x_max
-            y_max_c = min(bm_size, y_max) if bm_size is not None else y_max
-            if x_right <= x_left:
-                x_left, x_right = x_min_c, x_max_c
-            if y_top <= y_bottom:
-                y_bottom, y_top = y_min_c, y_max_c
+        # If the expanded-and-clamped interval collapses, fall back to bbox clamped to bed
+        x_min_c = max(0.0, x_min) if bm_size is not None else x_min
+        y_min_c = max(0.0, y_min) if bm_size is not None else y_min
+        x_max_c = min(bm_size, x_max) if bm_size is not None else x_max
+        y_max_c = min(bm_size, y_max) if bm_size is not None else y_max
+        if x_right <= x_left:
+            x_left, x_right = x_min_c, x_max_c
+        if y_top <= y_bottom:
+            y_bottom, y_top = y_min_c, y_max_c
 
-            # If still invalid (e.g., bbox fully outside bed), skip
-            if not (x_right > x_left and y_top > y_bottom):
-                return
+        # If still invalid (e.g., bbox fully outside bed), skip
+        if not (x_right > x_left and y_top > y_bottom):
+            return
 
-            # Base arrays (stay within clamped movement zone)
-            x_source: NDArray = np.array(
-                np.linspace(x_left, x_right, max(2, int(self.x_amnt))), dtype=float
-            )
+        # Base arrays (stay within clamped movement zone)
+        x_source: NDArray = np.array(
+            np.linspace(x_left, x_right, max(2, int(self.x_amnt))), dtype=float
+        )
 
-            height = abs(y_top - y_bottom)
-            y_amnt = max(2, int(height / max(self.stride, 1e-9)) + 1)
-            y_source: NDArray = np.linspace(y_top, y_bottom, y_amnt)
+        height = abs(y_top - y_bottom)
+        y_amnt = max(2, int(height / max(self.stride, 1e-9)) + 1)
+        y_source: NDArray = np.linspace(y_top, y_bottom, y_amnt)
 
-            # Create final y_array adapting to x_source: one horizontal sweep per y
-            y_final: NDArray = np.repeat(y_source, x_source.shape[0])
+        # Create final y_array adapting to x_source: one horizontal sweep per y
+        y_final: NDArray = np.repeat(y_source, x_source.shape[0])
 
-            # Populate x (serpentine: alternate direction each row)
-            x_final: NDArray = np.array([], dtype=float)
-            for count in range(0, len(y_source)):
-                if (count % 2 == 0):
-                    x_final = np.concatenate((x_final, x_source))
-                else:
-                    x_final = np.concatenate((x_final, np.flip(x_source)))
+        # Populate x (serpentine: alternate direction each row)
+        x_final: NDArray = np.array([], dtype=float)
+        for count in range(0, len(y_source)):
+            if (count % 2 == 0):
+                x_final = np.concatenate((x_final, x_source))
+            else:
+                x_final = np.concatenate((x_final, np.flip(x_source)))
 
-            # Assemble, ensure equal length
-            length: int = min(x_final.shape[0], y_final.shape[0])
-            x_final = x_final[0:length]
-            y_final = y_final[0:length]
-            points = np.vstack((x_final, y_final))
-            # Generate Movement list
-            cur_movements: List[Movement] = []
-            n = points.shape[1]
-            for pass_num in range(self.passes):
-                if pass_num % 2 == 0:
-                    order = range(n)
-                else:
-                    order = range(n - 1, -1, -1)
-                for i in order:
-                    x = float(points[0, i])
-                    y = float(points[1, i])
-                    mv = Movement(x, y, speed=self.speed)
-                    cur_movements.append(mv)
+        # Assemble, ensure equal length
+        length: int = min(x_final.shape[0], y_final.shape[0])
+        x_final = x_final[0:length]
+        y_final = y_final[0:length]
+        points = np.vstack((x_final, y_final))
+        # Generate Movement list
+        cur_movements: List[Movement] = []
+        n = points.shape[1]
+        for pass_num in range(self.passes):
+            if pass_num % 2 == 0:
+                order = range(n)
+            else:
+                order = range(n - 1, -1, -1)
+            for i in order:
+                x = float(points[0, i])
+                y = float(points[1, i])
+                mv = Movement(x, y, speed=self.speed)
+                cur_movements.append(mv)
 
-            self.serpentines = cur_movements
+        self.movements = cur_movements
 
     def draw(self, ax=None):
         """Draw the serpentine paths on the provided axis or create a new one."""
+        created_ax = False
         if ax is None:
+            import matplotlib
+            matplotlib.use('Agg')
             import matplotlib.pyplot as plt
             fig, ax = plt.subplots()
-        x = [movement.x for movement in self.serpentines]
-        y = [movement.y for movement in self.serpentines]
+            created_ax = True
+        x = [movement.x for movement in self.movements]
+        y = [movement.y for movement in self.movements]
         ax.quiver(x[:-1], y[:-1], np.diff(x), np.diff(y), angles='xy', scale_units='xy', scale=1)
         ax.set_xlim(0, self.bm.size_mm)
         ax.set_ylim(0, self.bm.size_mm)
         ax.grid(True)
-        if ax is None:
+        if created_ax:
+            import matplotlib.pyplot as plt
             plt.show()

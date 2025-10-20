@@ -130,8 +130,21 @@ class Scheduler:
         if live_plot:
             self._refresh_live_plot(ax)
 
+    def _ensure_interactive_backend(self):
+        """Attempt to switch to an interactive matplotlib backend if a non-interactive one is active."""
+        import matplotlib
+        backend = str(matplotlib.get_backend()).lower()
+        if 'agg' in backend or 'pdf' in backend or 'svg' in backend:
+            for candidate in ('QtAgg', 'Qt5Agg', 'TkAgg', 'MacOSX'):
+                try:
+                    matplotlib.use(candidate, force=True)
+                    break
+                except Exception:
+                    continue
+
     def _init_live_plot(self):
         """Initialize the live plot figure and axis in interactive mode with persistent artists."""
+        self._ensure_interactive_backend()
         import matplotlib.pyplot as plt
         from matplotlib.patches import Rectangle
         from scipy.ndimage import label as ndimage_label, find_objects
@@ -188,6 +201,10 @@ class Scheduler:
         fig.tight_layout()
         fig.canvas.draw()
         fig.canvas.flush_events()
+        try:
+            plt.show(block=False)
+        except Exception:
+            pass
 
         # Save handles for refresh
         self._fig = fig
