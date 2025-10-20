@@ -6,7 +6,7 @@ using the high-level Wrapper API.
 """
 
 import os
-from turtle import st
+import streamlit as st
 import numpy as np
 import time
 from wrapper.MaldiStatus import MaldiStatus, Config
