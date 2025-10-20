@@ -57,9 +57,6 @@ with col_btn1:
         config.set("x_points", int(x_points))
         config.set("passes", int(passes))
         st.success("✅ Configuration updated successfully!")
-
-# Refresh bed mesh
-with col_btn2:
-    if st.button("🔄 Refresh Bed Mesh", use_container_width=True):
         st.session_state.ms.refresh_bed_mesh()
-        st.success("✅ Bed mesh refreshed successfully!")
+
+
