@@ -1,7 +1,7 @@
 from dataclasses import dataclass
 from numpy import ndarray as NDArray
 import numpy as np
-from typing import Optional, Tuple, List
+from typing import Optional, Tuple, List, Callable
 from meshing import BedMesh
 from tqdm import tqdm
 
@@ -55,7 +55,7 @@ class Scheduler:
         # Track segments for live plotting: list of ((x0,y0), (x1,y1))
         self._segments: List[Tuple[Tuple[float, float], Tuple[float, float]]] = []
 
-    def start(self, live_plot: bool = False, refresh_every: int = 1):
+    def start(self, live_plot: bool = False, refresh_every: int = 1, progress_callback: Optional[Callable[[int, int], None]] = None):
         """
         Execute the scheduled movements, simulating nozzle deposition over the bed mesh.
 
@@ -66,6 +66,8 @@ class Scheduler:
         Args:
             live_plot (bool): Enable live plotting of the simulation. Defaults to False.
             refresh_every (int): Redraw frequency in number of high-level movements. Defaults to 1.
+            progress_callback (Optional[Callable[[int, int], None]]): Optional callback function
+                that receives (current_step, total_steps) for progress updates. Defaults to None.
         """
         fig = ax = None
         total_moves = len(self.movement_list)
@@ -74,7 +76,14 @@ class Scheduler:
             self._segments = []
             fig, ax = self._init_live_plot()
 
-        for idx, movement in enumerate(tqdm(self.movement_list, desc="Simulating movements", unit="move")):
+        # Use tqdm only if no progress_callback is provided
+        iterator = self.movement_list if progress_callback else tqdm(self.movement_list, desc="Simulating movements", unit="move")
+        
+        for idx, movement in enumerate(iterator):
+            # Call progress callback if provided
+            if progress_callback:
+                progress_callback(idx + 1, total_moves)
+            
             old_x = self.current_position[0]
             old_y = self.current_position[1]
             old_speed = self.current_speed

@@ -127,9 +127,16 @@ class MaldiStatus:
     def optimize_strides(self,
                         save_to_json: bool = True,
                         plot: bool = True,
-                        return_figs: bool = False):
+                        return_figs: bool = False,
+                        progress_callback = None):
         """
         Optimize serpentine strides and return best stride for the selected sample.
+        
+        Args:
+            save_to_json: Whether to save results to JSON file
+            plot: Whether to plot results
+            return_figs: Whether to return matplotlib figures
+            progress_callback: Optional callback function that receives (current_step, total_steps)
         """
         if not self.samples:
             raise ValueError("No samples available. Add a sample first.")
@@ -150,7 +157,8 @@ class MaldiStatus:
                 strides=strides,
                 save_to_json=save_json,
                 plot=plot,
-                return_figs=return_figs
+                return_figs=return_figs,
+                progress_callback=progress_callback
             )
             series = [float(np.mean(devs)) if isinstance(devs, (list, np.ndarray)) else float(devs)
                       for _, devs in s_aggregator.optimizer.dev_vs_stride]
@@ -236,9 +244,14 @@ class MaldiStatus:
             raise ValueError("GCodeCreator not initialized.")
         return self.gcode_creator.estimate_print_time()         
 
-    def simulate_manual_stride(self, stride: float, return_fig: bool = False) -> Optional[Any]:
+    def simulate_manual_stride(self, stride: float, return_fig: bool = False, progress_callback = None) -> Optional[Any]:
         """
         Simulate deposition with a manual stride value (applied to all samples).
+        
+        Args:
+            stride: Stride value to use for simulation
+            return_fig: Whether to return matplotlib figure
+            progress_callback: Optional callback function that receives (current_step, total_steps)
         """
         if self.bed_mesh is None:
             self.refresh_bed_mesh()
@@ -259,7 +272,7 @@ class MaldiStatus:
         
         from simulation import Scheduler
         sim = Scheduler(bed=self.bed_mesh, mov_list=movements)
-        sim.start(live_plot=False, refresh_every=1)  # No live plot for webapp
+        sim.start(live_plot=False, refresh_every=1, progress_callback=progress_callback)  # No live plot for webapp
         
         # Plot if requested
         if return_fig:

@@ -4,7 +4,7 @@ from simulation import Scheduler
 import numpy as np
 import json
 from datetime import datetime
-from typing import List
+from typing import List, Optional, Callable
 
 
 class Optimizer:
@@ -16,11 +16,11 @@ class Optimizer:
         # Keep a single-mask list for downstream JSON compatibility
         self.bool_masks = [self.serpentine.mask]
 
-    def _sim_routine(self, speed: float = 5):
+    def _sim_routine(self, speed: float = 5, progress_callback: Optional[Callable[[int, int], None]] = None):
         # Build scheduler from the single serpentine movements
         movements = list(self.serpentine.movements)
         sim = Scheduler(bed=self.bed_mesh, mov_list=movements)
-        sim.start(live_plot=self.verbose, refresh_every=1)
+        sim.start(live_plot=self.verbose, refresh_every=1, progress_callback=progress_callback)
 
     def span_std_vs_stride(
         self,
@@ -30,10 +30,15 @@ class Optimizer:
         plot: bool = True,
         ax=None,
         save_to_json: bool = False,
-        return_figs: bool = False
+        return_figs: bool = False,
+        progress_callback: Optional[Callable[[int, int], None]] = None
     ):
         """
         Sweep the serpentine stride, simulate, and collect deposition std-dev for each stride.
+
+        Args:
+            progress_callback: Optional callback function that receives (current_step, total_steps)
+                             for progress updates.
 
         Returns:
             (strides_array, dev_std_array, best_stride[, figs])
@@ -51,13 +56,18 @@ class Optimizer:
         # Run sweep
         original_stride = float(self.serpentine.stride)
         devs: List[List[float]] = []
-        for s in strides_arr:
+        total_strides = len(strides_arr)
+        for idx, s in enumerate(strides_arr):
             self.serpentine.set_stride(float(s))
             if reset_mesh_each:
                 self.bed_mesh.clear_deposition_mesh()
-            self._sim_routine(speed=speed)
+            self._sim_routine(speed=speed, progress_callback=progress_callback)
             dev_std = self.bed_mesh.get_std_deviation(overall_dev=False)
             devs.append(dev_std)
+            
+            # Update overall progress (stride-level)
+            if progress_callback:
+                progress_callback(idx + 1, total_strides)
 
         devs_arr = np.asarray(devs, dtype=float)
 

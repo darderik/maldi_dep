@@ -24,14 +24,30 @@ if st.button("▶️ Run Optimization", type="primary", use_container_width=True
     if not ms.samples:
         st.error("❌ No samples added. Please add samples first in the Samples page.")
     else:
-        with st.spinner("🔄 Running optimization..."):
-            best_strides = ms.optimize_strides(save_to_json=True, plot=False)
+        # Create a progress bar
+        progress_bar = st.progress(0)
+        status_text = st.empty()
+        
+        # Define progress callback for Streamlit
+        def update_progress(current, total):
+            progress = current / total
+            progress_bar.progress(progress)
+            status_text.text(f"🔄 Running optimization... {current}/{total} iterations")
+        
+        try:
+            best_strides = ms.optimize_strides(save_to_json=True, plot=False, progress_callback=update_progress)
             st.session_state.best_strides = best_strides
-        st.success(f"✅ Optimization complete! Best strides: {best_strides}")
-        col_metrics = st.columns(len(best_strides))
-        for i, (col, stride) in enumerate(zip(col_metrics, best_strides)):
-            with col:
-                st.metric(f"Sample {i+1} Optimal Stride", f"{stride:.3f} mm")
+            progress_bar.empty()
+            status_text.empty()
+            st.success(f"✅ Optimization complete! Best strides: {best_strides}")
+            col_metrics = st.columns(len(best_strides))
+            for i, (col, stride) in enumerate(zip(col_metrics, best_strides)):
+                with col:
+                    st.metric(f"Sample {i+1} Optimal Stride", f"{stride:.3f} mm")
+        except Exception as e:
+            progress_bar.empty()
+            status_text.empty()
+            st.error(f"❌ Error during optimization: {e}")
 
 # Show visualization if optimization has been run
 if st.session_state.best_strides is not None:
@@ -57,13 +73,29 @@ with col1:
         if not ms.samples:
             st.error("❌ No samples added. Please add samples first in the Samples page.")
         else:
-            with st.spinner("🔄 Running simulation..."):
-                fig = ms.simulate_manual_stride(stride, return_fig=True)
-            if fig:
-                with col2:
-                    st.pyplot(fig)
-                    plt.close(fig)
-            else:
-                st.error("❌ Simulation failed.")
+            # Create a progress bar for manual simulation
+            progress_bar = st.progress(0)
+            status_text = st.empty()
+            
+            # Define progress callback for Streamlit
+            def update_sim_progress(current, total):
+                progress = current / total
+                progress_bar.progress(progress)
+                status_text.text(f"🔄 Simulating... {current}/{total} movements")
+            
+            try:
+                fig = ms.simulate_manual_stride(stride, return_fig=True, progress_callback=update_sim_progress)
+                progress_bar.empty()
+                status_text.empty()
+                if fig:
+                    with col2:
+                        st.pyplot(fig)
+                        plt.close(fig)
+                else:
+                    st.error("❌ Simulation failed.")
+            except Exception as e:
+                progress_bar.empty()
+                status_text.empty()
+                st.error(f"❌ Error during simulation: {e}")
 with col2:
     st.info("ℹ️ Click 'Run Simulation' to see the deposition pattern for the specified stride value.")
