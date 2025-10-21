@@ -8,7 +8,7 @@ from gcode import MaskMovement, GCodeCreator
 import os
 import json
 from dataclasses import dataclass
-
+from scipy.interpolate import interp1d
 
 @dataclass
 class SampleAggregator:
@@ -99,17 +99,11 @@ class MaldiStatus:
             return self.samples[index]
         return None
 
-    def _get_diameter_for_z(self, z: float) -> float:
-        diameter=0.0
-        diameter_vs_z = Config().diameter_vs_z
-        if diameter_vs_z is not None:
-            diameter = np.interp(z, diameter_vs_z["z"], diameter_vs_z["diameter"])
-        return diameter
 
     def gaussian_function(self,mesh: Tuple[NDArray, NDArray]) -> NDArray:
         z_height = Config().get("z_height")
         if z_height is not None:
-            diameter = self._get_diameter_for_z(z_height)
+            diameter = Config()._get_diameter_for_z(z_height)
         else:
             raise ValueError("z_height must not be None")
         # Compute sigma from diameter

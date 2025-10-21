@@ -25,7 +25,7 @@ with col2:
     z_height = st.number_input("Z Height (mm)", value=float(config.get("z_height")), step=0.1, help="Z-axis height for movements")
     bed_size = st.number_input("Bed Size (mm)", value=float(config.get("bed_size_mm")), step=10.0, help="Size of the bed")
     max_speed = st.number_input("Max Speed (mm/s)", value=float(config.get("max_speed")), step=10.0, help="Maximum allowed speed")
-
+    margin = st.number_input("Sample Margin (mm)", value=float(config.get("margin")), step=0.5, help="Default margin around samples")
 st.markdown("---")
 st.header("🧪 Simulation Settings")
 st.markdown("Configure simulation parameters for optimization.")
@@ -56,10 +56,11 @@ with col_btn1:
         config.set("stride_steps", int(stride_steps))
         config.set("x_points", int(x_points))
         config.set("passes", int(passes))
+        config.set("margin", margin)
         st.success("✅ Configuration updated successfully!")
         st.session_state.ms.refresh_bed_mesh()
         st.session_state.best_strides = None
-        
+
 
 
 

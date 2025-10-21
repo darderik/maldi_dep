@@ -2,7 +2,9 @@ import json
 import os
 
 from meshing.BedMesh import BedMesh
-
+from scipy.interpolate import interp1d
+from scipy.stats import linregress
+from typing import List
 class Config:
     _instance = None
     _config_data = {}
@@ -32,7 +34,6 @@ class Config:
             "pattern": "serpentine",
             "x_size": 10,
             "y_size": 10,
-            "margin":5,
             "passes":1,
             "stride":1.0,
         }
@@ -43,6 +44,8 @@ class Config:
             "stride_steps": 10, # Number of stride steps to evaluate during optimization
             "x_points" : 20,
             "save_to_json": True,
+            "margin":5.0,
+
             
         }
         self.diameter_vs_z = {
@@ -75,6 +78,19 @@ class Config:
             return self.simulation_settings[key]
         else:
             raise KeyError(f"Simulation setting '{key}' not found.")
+
+    def _get_diameter_for_z(self, z: float) -> float:
+        diameter = 0.0
+        diameters: List[float] = self.diameter_vs_z["diameter"]
+        zs: List[float] = self.diameter_vs_z["z"]
+        if zs and diameters:
+            # Perform linear regression using scipy.stats.linregress
+            result = linregress(zs, diameters)
+            slope = result.slope
+            intercept = result.intercept
+            diameter = slope * z + intercept
+        return diameter
+
     def get(self,key:str=""):
         """Get config value by key."""
         if key in self.machine_settings.keys():
