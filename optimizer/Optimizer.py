@@ -44,6 +44,8 @@ class Optimizer:
             (strides_array, dev_std_array, best_stride[, figs])
         """
         import matplotlib.pyplot as plt
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        import os
 
         # Build stride sweep starting from current stride of the single serpentine
         speed = self.serpentine.speed
@@ -53,32 +55,62 @@ class Optimizer:
             strides = np.linspace(current, lower, num=10, retstep=False)
         strides_arr = np.asarray(list(strides), dtype=float)
 
-        # Run sweep
-        original_stride = float(self.serpentine.stride)
-        devs: List[List[float]] = []
-        total_strides = len(strides_arr)
-        for idx, s in enumerate(strides_arr):
-            self.serpentine.set_stride(float(s))
-            if reset_mesh_each:
-                self.bed_mesh.clear_deposition_mesh()
-            self._sim_routine(speed=speed, progress_callback=progress_callback)
-            dev_std = self.bed_mesh.get_std_deviation(overall_dev=False)
-            devs.append(dev_std)
-            
-            # Update overall progress (stride-level)
-            if progress_callback:
-                progress_callback(idx + 1, total_strides)
+        # Prepare immutable mask info to reproduce masks in worker beds
+        mask0 = self.bool_masks[0]
+        blc = getattr(mask0, 'bl_corner', (0.0, 0.0))
+        xs = float(getattr(mask0, 'x_size', 0.0))
+        ys = float(getattr(mask0, 'y_size', 0.0))
 
+        # Worker: run a full sim for a given stride on an isolated BedMesh
+        def _eval_stride(index: int, s_val: float):
+            bm = BedMesh(
+                size_mm=self.bed_mesh.size_mm,
+                grid_step_mm=self.bed_mesh.grid_step_mm,
+                spray_function=self.bed_mesh.spray_function,
+            )
+            # Recreate the boolean mask on this bed
+            bm.add_bool_mask(points=[float(blc[0]), float(blc[0]) + xs, float(blc[1]), float(blc[1]) + ys], shape="rectangle")
+            serp = SquaredSerpentine(
+                bm=bm,
+                bool_mask=bm._bool_masks[0],
+                margin=self.serpentine.margin,
+                x_amnt=self.serpentine.x_amnt,
+                stride=float(s_val),
+                speed=self.serpentine.speed,
+                max_speed=self.serpentine.max_speed,
+                passes=self.serpentine.passes,
+                alternate_offset=self.serpentine.alternate_offset,
+            )
+            sim = Scheduler(bed=bm, mov_list=list(serp.movements))
+            sim.start(live_plot=False)
+            dev_std = bm.get_std_deviation(overall_dev=False)
+            return index, float(s_val), dev_std
+
+        # Launch all in a thread pool
+        total_strides = len(strides_arr)
+        max_workers = min(32, (os.cpu_count() or 1) * 2)
+        futures = []
+        results_by_index: dict[int, tuple[float, List[float]]] = {}
+        with ThreadPoolExecutor(max_workers=max_workers) as ex:
+            for idx, s in enumerate(strides_arr):
+                futures.append(ex.submit(_eval_stride, idx, float(s)))
+            completed = 0
+            for fut in as_completed(futures):
+                idx, s_val, dev_std = fut.result()
+                results_by_index[idx] = (s_val, dev_std)
+                completed += 1
+                if progress_callback:
+                    progress_callback(completed, total_strides)
+
+        # Order results according to input strides
+        ordered = [results_by_index[i] for i in range(total_strides)]
+        strides_arr = np.asarray([s for (s, _) in ordered], dtype=float)
+        devs = [dev for (_, dev) in ordered]
         devs_arr = np.asarray(devs, dtype=float)
 
         # Store results
         self.dev_vs_stride = list(zip(map(float, strides_arr), devs))
 
-        # Restore stride if requested
-        if restore_stride:
-            self.serpentine.set_stride(original_stride)
-
-        figs = []
         # Determine best stride (use mean across components if multiple connected regions are found)
         if devs_arr.ndim == 2:
             series = devs_arr.mean(axis=1)
@@ -88,11 +120,12 @@ class Optimizer:
         best_stride = float(strides_arr[best_stride_idx])
         best_dev = float(series[best_stride_idx])
 
+        figs = []
         # Plot the best stride result if requested
         if plot:
-            figs.append(None)  # Placeholder if needed
-
-            # Simulate deposition for the best stride on a fresh mesh
+            figs.append(None)
+            # Simulate deposition for the best stride on the main bed for visualization
+            original_stride = float(self.serpentine.stride)
             self.serpentine.set_stride(best_stride)
             self.bed_mesh.clear_deposition_mesh()
             self._sim_routine(speed=speed)
@@ -108,8 +141,6 @@ class Optimizer:
             ax2.grid(True, linestyle='--', alpha=0.3)
             if not return_figs:
                 plt.show()
-
-            # Restore original stride if requested
             if restore_stride:
                 self.serpentine.set_stride(original_stride)
 

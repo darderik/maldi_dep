@@ -10,7 +10,6 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from scipy.ndimage import label as ndimage_label, find_objects
 
-
 class BedMesh:
     def __init__(self, size_mm: float, grid_step_mm: float, spray_function: Optional[Callable] = None):
         """
@@ -20,6 +19,8 @@ class BedMesh:
             size_mm (float): The size of the mesh in millimeters.
             grid_step_mm (float): The step size of the grid in millimeters.
         """
+        from wrapper.Config import Config
+
         steps_count = int(round(size_mm / grid_step_mm)) + 1
         self.steps_count = steps_count
         self._x_space = np.linspace(0, size_mm, steps_count)
@@ -31,6 +32,8 @@ class BedMesh:
         self.grid_step_mm = grid_step_mm
         self._bool_masks = []
         self.spray_function = spray_function
+        self.z_height = Config().get_height()
+        self.spray_size_mm = Config()._get_diameter_for_z(self.z_height)
         self.init_nozzle()
 
     def get_point(self, x: float, y: float, method: str = "cubic"):
@@ -51,35 +54,35 @@ class BedMesh:
         result = interpolator([x, y])
         return result
 
-    def add_bool_mask(self, points: List[List[float]], shape: str = "rectangle", ) :
+    def add_bool_mask(self, points: List[float], shape: str = "rectangle"):
         """
-        Add a boolean mask to the bed mesh.
+        Add a single boolean mask to the bed mesh.
 
         Args:
-            points (ArrayLike): An array of points defining the mask. For rectangles, this should be an array of (x_min, x_max, y_min, y_max).
-            shape (str): The shape of the mask (default is "rectangle").
+            points (List[float]): Rectangle defined as [x_min, x_max, y_min, y_max].
+            shape (str): The shape of the mask (currently only "rectangle").
 
         Raises:
-            ValueError: If the shape is not recognized.
+            ValueError: If the shape is not recognized or the points are invalid.
         """
         from .Mask import SampleMask
         if shape == "rectangle":
-            points_arr = np.array(points)
-            for sample in points_arr:
-                corner1 = (sample[0], sample[2])
-                x_size = sample[1] - sample[0]
-                y_size = sample[3] - sample[2]
-                mask = SampleMask(
-                    size_mm=self.size_mm,
-                    grid_step_mm=self.grid_step_mm,
-                    bl_corner=corner1,
-                    x_size=x_size,
-                    y_size=y_size,
-                )
-                mask.apply(self, apply_position=(0, 0), mask_anchor=(0, 0))
-                self._bool_masks.append(mask)
-                return mask
-                
+            if points is None or len(points) != 4:
+                raise ValueError("points must be [x_min, x_max, y_min, y_max]")
+            sample = np.asarray(points, dtype=float)
+            corner1 = (float(sample[0]), float(sample[2]))
+            x_size = float(sample[1] - sample[0])
+            y_size = float(sample[3] - sample[2])
+            mask = SampleMask(
+                size_mm=self.size_mm,
+                grid_step_mm=self.grid_step_mm,
+                bl_corner=corner1,
+                x_size=x_size,
+                y_size=y_size,
+            )
+            mask.apply(self, apply_position=(0, 0), mask_anchor=(0, 0))
+            self._bool_masks.append(mask)
+            return mask
         else:
             raise ValueError(f"Unknown shape: {shape}")  # TODO More shapes
 

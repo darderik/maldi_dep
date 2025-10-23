@@ -29,6 +29,7 @@ class MaldiStatus:
         self.samples: List[SampleAggregator] = []
         self.initialized = True
         self.gcode_creator: Optional[GCodeCreator] = None
+        self.refresh_bed_mesh()
     def refresh_bed_mesh(self) -> None:
         self.bed_mesh = BedMesh(
             size_mm=Config().get("bed_size_mm"),
@@ -36,7 +37,6 @@ class MaldiStatus:
             spray_function=self.gaussian_function
         )
         self.samples = []  # Clear existing samples when refreshing bed mesh
-
     def add_sample(self, sample_config: SampleConfig ,verbose: bool = False) -> None:
         if self.bed_mesh is None:
             self.refresh_bed_mesh()
@@ -48,7 +48,7 @@ class MaldiStatus:
 
         # Object creation
         samplemask: Optional[SampleMask] = self.bed_mesh.add_bool_mask(
-            points=[[bl_corner[0], bl_corner[0]+x_size, bl_corner[1], bl_corner[1]+y_size]],
+            points=[bl_corner[0], bl_corner[0]+x_size, bl_corner[1], bl_corner[1]+y_size],
             shape="rectangle"
         )
         assert samplemask is not None
@@ -104,6 +104,7 @@ class MaldiStatus:
 
     def gaussian_function(self,mesh: Tuple[NDArray, NDArray]) -> NDArray:
         z_height = Config().get("z_height")
+        standard_dev = Config().get_standard_dev()
         if z_height is not None:
             diameter = Config()._get_diameter_for_z(z_height)
         else:
@@ -111,7 +112,7 @@ class MaldiStatus:
         # Compute sigma from diameter
         if diameter is None or diameter <= 0:
             raise ValueError("Invalid diameter computed from z_height.")
-        sigma = diameter/4.5
+        sigma = standard_dev
         x, y = mesh
         return 50*np.exp(-(x**2 + y**2) / (2 * sigma**2)) / (2 * np.pi * sigma**2)
 

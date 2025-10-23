@@ -84,54 +84,46 @@ class Scheduler:
             if progress_callback:
                 progress_callback(idx + 1, total_moves)
             
-            old_x = self.current_position[0]
-            old_y = self.current_position[1]
-            old_speed = self.current_speed
+            # Starting point of this high-level movement (for plotting)
+            start_of_move = self.current_position
 
-            x = movement.x
-            y = movement.y
-            speed = movement.speed
-            step = self.bed.grid_step_mm
+            x_target = float(movement.x)
+            y_target = float(movement.y)
+            speed = float(movement.speed)
+            step = float(self.bed.grid_step_mm)
 
-            distance = np.sqrt((x - old_x) ** 2 + (y - old_y) ** 2)
-            time_duration = distance / speed if speed != 0 else 0.0
-            x_distance = x - old_x
-            y_distance = y - old_y
-            if (distance < step):
-                # If the distance is less than a step, just spray at the current position
-                self.bed._nozzle.spray(apply_position=(old_x, old_y))
-                # Track trivial move for plotting
-                if live_plot:
-                    self._segments.append(((old_x, old_y), (old_x, old_y)))
-                    if (idx % max(1, refresh_every) == 0) or (idx == total_moves - 1):
-                        self._refresh_live_plot(ax)
-                continue
-            distance = np.sqrt(x_distance ** 2 + y_distance ** 2)
-            # Calculate speed for even steps x y
-            if time_duration == 0:
-                x_speed = 0.0
-                y_speed = 0.0
+            dx_total = x_target - start_of_move[0]
+            dy_total = y_target - start_of_move[1]
+            distance = float(np.hypot(dx_total, dy_total))
+            time_duration = (distance / speed) if speed > 0 else 0.0
+
+            # Determine steps by space and by time, then take the max
+            n_by_space = int(np.ceil(distance / step)) if step > 0 else 1
+            n_by_space = max(1, n_by_space)
+            if self.min_time_step > 0 and time_duration > 0:
+                n_by_time = int(np.ceil(time_duration / self.min_time_step))
             else:
-                x_speed = x_distance / time_duration
-                y_speed = y_distance / time_duration
+                n_by_time = 1
+            n_steps = max(1, n_by_space, n_by_time)
 
-            time_steps_count = int(distance / step) if int(distance /
-                                                           step) > self.min_time_step else int(distance / self.min_time_step)
-            time_steps = np.linspace(self.current_time, self.current_time + time_duration, max(1, time_steps_count))
-            # Check error ?
-            for t in time_steps:
-                old_x = self.current_position[0]
-                old_y = self.current_position[1]
-                time_incr = t - self.current_time
-                if time_incr > 0:
-                    self.current_position = (old_x + x_speed * time_incr,
-                                             old_y + y_speed * time_incr)
-                    self.bed._nozzle.spray(apply_position=self.current_position, time=time_incr)
-                    self.current_time = t
+            # Per-step increments
+            dt = time_duration / n_steps if n_steps > 0 else 0.0
+            inc_x = dx_total / n_steps if n_steps > 0 else 0.0
+            inc_y = dy_total / n_steps if n_steps > 0 else 0.0
+
+            # March along the segment depositing at each sub-step
+            for _ in range(n_steps):
+                self.current_position = (
+                    self.current_position[0] + inc_x,
+                    self.current_position[1] + inc_y,
+                )
+                # Use dt to scale deposition proportionally to dwell time
+                self.bed._nozzle.spray(apply_position=self.current_position, time=dt)
+                self.current_time += dt
 
             # After completing this high-level movement, record the segment and refresh if needed
             if live_plot:
-                self._segments.append(((old_x, old_y), (self.current_position[0], self.current_position[1])))
+                self._segments.append((start_of_move, (self.current_position[0], self.current_position[1])))
                 if (idx % max(1, refresh_every) == 0) or (idx == total_moves - 1):
                     self._refresh_live_plot(ax)
 

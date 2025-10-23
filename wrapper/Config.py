@@ -22,6 +22,7 @@ class Config:
 
     def _initialize_config(self):
         """Initialize default configuration values."""
+        self.k_sigma = 2.0 #Edit at will
         self.machine_settings = {
             "speed": 10, # Speed for any movement (mm/s)
             "acceleration": 100, # Acceleration for any movement (mm/s^2)
@@ -67,6 +68,14 @@ class Config:
             5.0
         ]
         }
+    def get_standard_dev(self) -> float:
+        """Get standard deviation based on current z height."""
+        z_height = self.get_height()
+        k_sigma = self.k_sigma #Edit at will
+        diameter = self._get_diameter_for_z(z_height)
+        if diameter <= 0:
+            raise ValueError("Invalid diameter computed from z_height.")
+        return diameter / (2*k_sigma)  # Assuming 4 sigma within diameter
     def get_msetting(self,key:str=""):
         """Get machine setting by key."""
         if key in self.machine_settings:
@@ -79,7 +88,8 @@ class Config:
             return self.simulation_settings[key]
         else:
             raise KeyError(f"Simulation setting '{key}' not found.")
-
+    def get_height(self) -> float:
+        return self.machine_settings.get("z_height", 0.0)
     def _get_diameter_for_z(self, z: float) -> float:
         diameter = 0.0
         diameters: List[float] = self.diameter_vs_z["diameter"]
