@@ -60,6 +60,10 @@ if st.session_state.best_strides is not None:
             fig = ms.visualize_optimized_samples(st.session_state.best_strides)
             st.pyplot(fig)
             plt.close(fig)
+            # Add standard deviation metric
+            if ms.bed_mesh is not None:
+                std_devs = ms.bed_mesh.get_std_deviation(overall_dev=True)
+                st.metric("Deposition Standard Deviation", f"{std_devs[0]:.3f}")
         except Exception as e:
             st.error(f"❌ Error generating visualization: {e}")
 

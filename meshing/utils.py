@@ -11,8 +11,9 @@ def boolean_function(mesh: Tuple[NDArray, NDArray], corner1: NDArray |
     x1c, y1c, x2c, y2c = corner1[0], corner1[1], corner1[0] + x_size, corner1[1] + y_size
 
     x, y = mesh
+    # Inclusive on bottom-left, exclusive on top-right to avoid boundary overlaps between adjacent samples
     # TODO Float issues on comparison
-    return np.logical_and(np.logical_and(x >= x1c, x <= x2c), np.logical_and(y >= y1c, y <= y2c))
+    return np.logical_and(np.logical_and(x >= x1c, x < x2c), np.logical_and(y >= y1c, y < y2c))
 
 
 def shift(array: NDArray, offset: ArrayLike, constant_values=0):

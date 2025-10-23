@@ -1,2 +1,2 @@
-from .Config import Config
+from .Config import Config, SampleConfig
 from .MaldiStatus import MaldiStatus, SampleAggregator

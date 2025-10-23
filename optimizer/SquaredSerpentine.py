@@ -11,7 +11,7 @@ from simulation import Movement
 
 class SquaredSerpentine:
     def __init__(self, bm: BedMesh, bool_mask: Mask, margin: float = 4, x_amnt: int = 2, stride: float = 1,
-                 speed: float = 5.0, max_speed: float = 100.0, passes: int = 1) -> None:
+                 speed: float = 5.0, max_speed: float = 100.0, passes: int = 1, alternate_offset: bool = False) -> None:
         # Elaborate corners of bool mask
         # Only a single boolean mask for each squared serpentine, no simultaneous masks
         self.mask = bool_mask
@@ -23,6 +23,7 @@ class SquaredSerpentine:
         self.passes = passes
         self.speed = speed
         self.max_speed = max_speed
+        self.alternate_offset = alternate_offset
         self._compute_serpentines()
     def get_stride(self) -> float:
         """Get the current stride value."""
@@ -121,13 +122,18 @@ class SquaredSerpentine:
         cur_movements: List[Movement] = []
         n = points.shape[1]
         for pass_num in range(self.passes):
-            if pass_num % 2 == 0:
+            # If even pass, follow normal order, else reverse order
+            is_even_pass: bool = (pass_num % 2 == 0)
+            if is_even_pass:
                 order = range(n)
             else:
                 order = range(n - 1, -1, -1)
+            y_ofs = 0.0
             for i in order:
+                if not is_even_pass and self.alternate_offset:
+                    y_ofs = self.stride / 2.0
                 x = float(points[0, i])
-                y = float(points[1, i])
+                y = float(points[1, i]) + y_ofs
                 mv = Movement(x, y, speed=self.speed)
                 cur_movements.append(mv)
 

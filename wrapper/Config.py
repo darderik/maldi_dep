@@ -4,7 +4,8 @@ import os
 from meshing.BedMesh import BedMesh
 from scipy.interpolate import interp1d
 from scipy.stats import linregress
-from typing import List
+from typing import Any, List
+from dataclasses import dataclass
 class Config:
     _instance = None
     _config_data = {}
@@ -111,3 +112,13 @@ class Config:
             self._sample_defaults[key] = value
         else:
             raise KeyError(f"Config key '{key}' not found.")
+class SampleConfig:
+    def __init__(self, sample_data: dict):
+        self.sample_data = sample_data
+        
+    def get(self, key: str):
+        """Get sample config value by key."""
+        if key in self.sample_data:
+            return self.sample_data[key]
+        else:
+            raise KeyError(f"Sample config key '{key}' not found.")

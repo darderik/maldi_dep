@@ -1,5 +1,5 @@
 from typing import Any, List, Optional, Tuple
-from .Config import Config
+from .Config import Config, SampleConfig
 from numpy import ndarray as NDArray
 from meshing import BedMesh, SampleMask
 import numpy as np
@@ -37,14 +37,15 @@ class MaldiStatus:
         )
         self.samples = []  # Clear existing samples when refreshing bed mesh
 
-    def add_sample(self, bl_corner: Tuple[float, float], x_size: Optional[float] = None, y_size: Optional[float] = None, verbose: bool = False) -> None:
+    def add_sample(self, sample_config: SampleConfig ,verbose: bool = False) -> None:
         if self.bed_mesh is None:
             self.refresh_bed_mesh()
         assert self.bed_mesh is not None
         sample_defaults = self.config._sample_defaults
-        x_size = x_size if x_size is not None else sample_defaults.get("x_size", 10)
-        y_size = y_size if y_size is not None else sample_defaults.get("y_size", 10)
-        
+        x_size = sample_config.get("x_size") or sample_defaults.get("x_size", 10)
+        y_size = sample_config.get("y_size") or sample_defaults.get("y_size", 10)
+        bl_corner = sample_config.get("bl_corner") or (0, 0)
+
         # Object creation
         samplemask: Optional[SampleMask] = self.bed_mesh.add_bool_mask(
             points=[[bl_corner[0], bl_corner[0]+x_size, bl_corner[1], bl_corner[1]+y_size]],
@@ -54,12 +55,13 @@ class MaldiStatus:
         serp = SquaredSerpentine(
                 bm=self.bed_mesh,
                 bool_mask=samplemask,
-                margin=Config().get("margin"),
+                margin=sample_config.get("margin"),
                 x_amnt=Config().get("x_points"),
                 stride=Config().get("stride"),
                 speed=Config().get("speed"),
                 max_speed=Config().get("max_speed"),
-                passes=Config().get("passes")
+                passes=sample_config.get("passes"),
+                alternate_offset=sample_config.get("alternate_offset"),
                 )
         assert serp is not None
         opti = Optimizer(bed_mesh=self.bed_mesh, serpentine=serp, verbose=verbose)
@@ -109,7 +111,7 @@ class MaldiStatus:
         # Compute sigma from diameter
         if diameter is None or diameter <= 0:
             raise ValueError("Invalid diameter computed from z_height.")
-        sigma = diameter/2
+        sigma = diameter/4.5
         x, y = mesh
         return 50*np.exp(-(x**2 + y**2) / (2 * sigma**2)) / (2 * np.pi * sigma**2)
 
