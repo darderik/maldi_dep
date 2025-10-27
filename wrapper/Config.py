@@ -66,7 +66,8 @@ class Config:
             1.0,
             8.0,
             5.0
-        ]
+        ],
+            "z_offset": 20.0
         }
     def get_standard_dev(self) -> float:
         """Get standard deviation based on current z height."""
@@ -94,6 +95,8 @@ class Config:
         diameter = 0.0
         diameters: List[float] = self.diameter_vs_z["diameter"]
         zs: List[float] = self.diameter_vs_z["z"]
+        z_offset: float = self.diameter_vs_z.get("z_offset", 0.0)
+        z = z + z_offset
         if zs and diameters:
             # Perform linear regression using scipy.stats.linregress
             result = linregress(zs, diameters)

@@ -36,6 +36,7 @@ with col3:
 with col4:
     stride_steps = st.number_input("Stride Steps", value=int(config.get("stride_steps")), step=1, min_value=1, help="Number of stride steps to evaluate")
     x_points = st.number_input("X Points", value=int(config.get("x_points")), step=1, help="Number of points in X direction")
+    z_offset = st.number_input("Z Offset (mm)", value=float(config.diameter_vs_z.get("z_offset", 0.0)), step=0.1, help="Height of the nozzle when the printer is set to z=0")
 st.markdown("---")
 # Update config
 col_btn1, col_btn2 = st.columns(2)
@@ -53,6 +54,7 @@ with col_btn1:
         config.set("maximum_stride", max_stride)
         config.set("stride_steps", int(stride_steps))
         config.set("x_points", int(x_points))
+        config.diameter_vs_z["z_offset"] = z_offset
         st.success("✅ Configuration updated successfully!")
         st.session_state.ms.refresh_bed_mesh()
         st.session_state.best_strides = None
