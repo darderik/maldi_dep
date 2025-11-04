@@ -5,6 +5,9 @@ import numpy as np
 import json
 from datetime import datetime
 from typing import List, Optional, Callable
+from logging_config import get_logger
+
+logger = get_logger("MALDI.Optimizer")
 
 
 class Optimizer:
@@ -15,6 +18,7 @@ class Optimizer:
         self.verbose = verbose
         # Keep a single-mask list for downstream JSON compatibility
         self.bool_masks = [self.serpentine.mask]
+        logger.info(f"Optimizer initialized with stride={serpentine.stride:.3f}mm, margin={serpentine.margin:.3f}mm")
 
     def _sim_routine(self, speed: float = 5, progress_callback: Optional[Callable[[int, int], None]] = None):
         # Build scheduler from the single serpentine movements
@@ -54,6 +58,9 @@ class Optimizer:
             lower = max(float(self.bed_mesh.grid_step_mm), current / 5.0, 0.05)
             strides = np.linspace(current, lower, num=10, retstep=False)
         strides_arr = np.asarray(list(strides), dtype=float)
+        
+        logger.info(f"Starting stride optimization sweep with {len(strides_arr)} strides")
+        logger.info(f"Stride range: {strides_arr.min():.3f}mm - {strides_arr.max():.3f}mm")
 
         # Prepare immutable mask info to reproduce masks in worker beds
         mask0 = self.bool_masks[0]
@@ -84,6 +91,7 @@ class Optimizer:
             sim = Scheduler(bed=bm, mov_list=list(serp.movements))
             sim.start(live_plot=False)
             dev_std = bm.get_std_deviation(overall_dev=False)
+            logger.debug(f"Stride {s_val:.3f}mm - std_dev: {np.mean(dev_std) if isinstance(dev_std, (list, np.ndarray)) else dev_std:.4f}")
             return index, float(s_val), dev_std
 
         # Launch all in a thread pool
@@ -91,6 +99,7 @@ class Optimizer:
         max_workers = min(32, (os.cpu_count() or 1) * 2)
         futures = []
         results_by_index: dict[int, tuple[float, List[float]]] = {}
+        logger.info(f"Launching {total_strides} stride evaluations with {max_workers} workers")
         with ThreadPoolExecutor(max_workers=max_workers) as ex:
             for idx, s in enumerate(strides_arr):
                 futures.append(ex.submit(_eval_stride, idx, float(s)))
@@ -101,6 +110,7 @@ class Optimizer:
                 completed += 1
                 if progress_callback:
                     progress_callback(completed, total_strides)
+                logger.info(f"Stride evaluation progress: {completed}/{total_strides}")
 
         # Order results according to input strides
         ordered = [results_by_index[i] for i in range(total_strides)]
@@ -119,6 +129,8 @@ class Optimizer:
         best_stride_idx = int(np.argmin(series))
         best_stride = float(strides_arr[best_stride_idx])
         best_dev = float(series[best_stride_idx])
+        
+        logger.info(f"Optimization complete! Best stride: {best_stride:.3f}mm with std_dev: {best_dev:.4f}")
 
         figs = []
         # Plot the best stride result if requested
@@ -171,6 +183,7 @@ class Optimizer:
                         "best_devs": float(best_dev),
                         "bool_masks": [_mask_info(self.bool_masks[0])]
                     }, f, indent=4)
+                logger.info(f"Results saved to logs/dev_vs_stride_{timestamp.replace(':', '-')}.json")
         if return_figs:
             return strides_arr, devs_arr, best_stride, figs
         return strides_arr, devs_arr, best_stride

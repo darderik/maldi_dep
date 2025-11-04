@@ -1,0 +1,47 @@
+{
+  "k_sigma": 2.0,
+  "machine_settings": {
+    "speed": 5.0,
+    "acceleration": 100.0,
+    "nozzle_temperature": 100.0,
+    "bed_temperature": 50.0,
+    "z_height": 60.0,
+    "bed_size_mm": 200.0,
+    "max_speed": 200.0
+  },
+  "simulation_settings": {
+    "grid_step": 0.3,
+    "minimum_stride": 0.5,
+    "maximum_stride": 10.0,
+    "stride_steps": 30,
+    "x_points": 20,
+    "save_to_json": true,
+    "margin": 5.0
+  },
+  "sample_defaults": {
+    "pattern": "serpentine",
+    "x_size": 10,
+    "y_size": 10,
+    "passes": 1,
+    "stride": 1.0
+  },
+  "diameter_vs_z": {
+    "z": [
+      30.0,
+      20.0,
+      10.0,
+      5.0,
+      70.0,
+      40.0
+    ],
+    "diameter": [
+      4.0,
+      3.0,
+      2.0,
+      1.0,
+      8.0,
+      5.0
+    ],
+    "z_offset": 5.0
+  }
+}

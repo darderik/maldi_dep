@@ -1,6 +1,12 @@
 import streamlit as st
 from wrapper.MaldiStatus import MaldiStatus
 import matplotlib.pyplot as plt
+from pathlib import Path
+import sys
+sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+from logging_config import get_logger
+
+logger = get_logger("MALDI.WebApp.Simulation")
 
 st.set_page_config(page_title="Simulation", page_icon="🔬", layout="wide")
 
@@ -24,6 +30,7 @@ if st.button("▶️ Run Optimization", type="primary", use_container_width=True
     if not ms.samples:
         st.error("❌ No samples added. Please add samples first in the Samples page.")
     else:
+        logger.info("User clicked 'Run Optimization' button")
         # Create a progress bar
         progress_bar = st.progress(0)
         status_text = st.empty()
@@ -35,10 +42,12 @@ if st.button("▶️ Run Optimization", type="primary", use_container_width=True
             status_text.text(f"🔄 Running optimization... {current}/{total} iterations")
         
         try:
+            logger.info(f"Starting optimization with {len(ms.samples)} sample(s)")
             best_strides = ms.optimize_strides(save_to_json=True, plot=False, progress_callback=update_progress)
             st.session_state.best_strides = best_strides
             progress_bar.empty()
             status_text.empty()
+            logger.info(f"Optimization successful! Best strides: {best_strides}")
             st.success(f"✅ Optimization complete! Best strides: {best_strides}")
             col_metrics = st.columns(len(best_strides))
             for i, (col, stride) in enumerate(zip(col_metrics, best_strides)):
@@ -47,6 +56,7 @@ if st.button("▶️ Run Optimization", type="primary", use_container_width=True
         except Exception as e:
             progress_bar.empty()
             status_text.empty()
+            logger.error(f"Error during optimization: {str(e)}", exc_info=True)
             st.error(f"❌ Error during optimization: {e}")
 
 # Show visualization if optimization has been run
@@ -88,18 +98,22 @@ with col1:
                 status_text.text(f"🔄 Simulating... {current}/{total} movements")
             
             try:
+                logger.info(f"Starting manual simulation with stride={stride:.3f}mm")
                 fig = ms.simulate_manual_stride(stride, return_fig=True, progress_callback=update_sim_progress)
                 progress_bar.empty()
                 status_text.empty()
+                logger.info(f"Manual simulation completed for stride={stride:.3f}mm")
                 if fig:
                     with col2:
                         st.pyplot(fig)
                         plt.close(fig)
                 else:
+                    logger.warning("Manual simulation returned None figure")
                     st.error("❌ Simulation failed.")
             except Exception as e:
                 progress_bar.empty()
                 status_text.empty()
+                logger.error(f"Error during manual simulation: {str(e)}", exc_info=True)
                 st.error(f"❌ Error during simulation: {e}")
 with col2:
     st.info("ℹ️ Click 'Run Simulation' to see the deposition pattern for the specified stride value.")

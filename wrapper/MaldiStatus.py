@@ -9,6 +9,9 @@ import os
 import json
 from dataclasses import dataclass
 from scipy.interpolate import interp1d
+from logging_config import get_logger
+
+logger = get_logger("MALDI.MaldiStatus")
 
 @dataclass
 class SampleAggregator:
@@ -30,6 +33,7 @@ class MaldiStatus:
         self.initialized = True
         self.gcode_creator: Optional[GCodeCreator] = None
         self.refresh_bed_mesh()
+        logger.info("MaldiStatus initialized")
     def refresh_bed_mesh(self) -> None:
         self.bed_mesh = BedMesh(
             size_mm=Config().get("bed_size_mm"),
@@ -37,6 +41,7 @@ class MaldiStatus:
             spray_function=self.gaussian_function
         )
         self.samples = []  # Clear existing samples when refreshing bed mesh
+        logger.debug(f"Bed mesh refreshed: size={Config().get('bed_size_mm')}mm, grid_step={Config().get('grid_step')}mm")
     def add_sample(self, sample_config: SampleConfig ,verbose: bool = False) -> None:
         if self.bed_mesh is None:
             self.refresh_bed_mesh()
@@ -45,6 +50,8 @@ class MaldiStatus:
         x_size = sample_config.get("x_size") or sample_defaults.get("x_size", 10)
         y_size = sample_config.get("y_size") or sample_defaults.get("y_size", 10)
         bl_corner = sample_config.get("bl_corner") or (0, 0)
+        
+        logger.info(f"Adding sample: position={bl_corner}, size={x_size}x{y_size}mm, passes={sample_config.get('passes')}")
 
         # Object creation
         samplemask: Optional[SampleMask] = self.bed_mesh.add_bool_mask(
@@ -75,6 +82,7 @@ class MaldiStatus:
             optimizer=opti
         )
         self.samples.append(s_aggregator)
+        logger.debug(f"Sample #{len(self.samples)} created successfully")
 
     def get_samples(self) -> List[SampleMask]:
         if self.bed_mesh is None:
@@ -138,15 +146,18 @@ class MaldiStatus:
         if not self.samples:
             raise ValueError("No samples available. Add a sample first.")
 
+        logger.info(f"Starting stride optimization for {len(self.samples)} sample(s)")
         best_strides: List[float] = []
         for idx, s_aggregator in enumerate(self.samples):
             if s_aggregator.optimizer is None:
                 continue
+            logger.info(f"Optimizing sample {idx+1}/{len(self.samples)}")
             # Prepare parameters from Config
             minimum_stride = Config().get("minimum_stride")
             maximum_stride = Config().get("maximum_stride")
             stride_steps = Config().get("stride_steps")
             strides = np.linspace(minimum_stride, maximum_stride, stride_steps)
+            logger.debug(f"Stride parameters: min={minimum_stride}mm, max={maximum_stride}mm, steps={stride_steps}")
             # Use the provided flag directly
             save_json = save_to_json
 
@@ -162,7 +173,9 @@ class MaldiStatus:
             best_idx = int(np.argmin(series))
             best_stride = float(s_aggregator.optimizer.dev_vs_stride[best_idx][0])
             best_strides.append(best_stride)
+            logger.info(f"Sample {idx+1} optimal stride: {best_stride:.3f}mm")
         # Fallback if sample_idx out of range
+        logger.info(f"Stride optimization completed. Best strides: {[f'{s:.3f}' for s in best_strides]}")
         return best_strides
     def gcode_from_specific_stride(self, stride:float, output_file: str = "output_specific_stride.gcode") -> str:
         """
