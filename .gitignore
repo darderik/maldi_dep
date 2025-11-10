@@ -89,3 +89,4 @@ logs/
 *.swp
 ._*
 *.gcode
+*.log

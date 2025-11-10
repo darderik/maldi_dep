@@ -9,6 +9,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 from scipy.ndimage import label as ndimage_label, find_objects
+from wrapper.Config import Config
 
 class BedMesh:
     def __init__(self, size_mm: float, grid_step_mm: float, spray_function: Optional[Callable] = None):
@@ -19,7 +20,6 @@ class BedMesh:
             size_mm (float): The size of the mesh in millimeters.
             grid_step_mm (float): The step size of the grid in millimeters.
         """
-        from wrapper.Config import Config
 
         steps_count = int(round(size_mm / grid_step_mm)) + 1
         self.steps_count = steps_count
@@ -33,9 +33,15 @@ class BedMesh:
         self._bool_masks = []
         self.spray_function = spray_function
         self.z_height = Config().get_height()
-        self.spray_size_mm = Config()._get_diameter_for_z(self.z_height)
         self.init_nozzle()
-
+    
+    @property
+    def spray_size_mm(self) -> float:
+        """Get the spray size in millimeters."""
+        conf = Config()
+        size = conf._get_diameter_for_z(self.z_height)
+        return size
+    
     def get_point(self, x: float, y: float, method: str = "cubic"):
         """
         Get the value at a specific point in the mesh.

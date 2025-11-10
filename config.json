@@ -1,19 +1,19 @@
 {
   "k_sigma": 2.0,
   "machine_settings": {
-    "speed": 5.0,
+    "speed": 10.0,
     "acceleration": 100.0,
     "nozzle_temperature": 100.0,
     "bed_temperature": 50.0,
-    "z_height": 60.0,
+    "z_height": 40.0,
     "bed_size_mm": 200.0,
     "max_speed": 200.0
   },
   "simulation_settings": {
-    "grid_step": 0.3,
+    "grid_step": 0.2,
     "minimum_stride": 0.5,
     "maximum_stride": 10.0,
-    "stride_steps": 30,
+    "stride_steps": 40,
     "x_points": 20,
     "save_to_json": true,
     "margin": 5.0

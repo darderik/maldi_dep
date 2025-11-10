@@ -3,8 +3,22 @@ from wrapper.MaldiStatus import MaldiStatus
 import matplotlib.pyplot as plt
 from pathlib import Path
 import sys
+import numpy as np  # For any potential numeric handling
+# Removed scipy.ndimage import; using existing get_std_deviation instead
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from logging_config import get_logger
+
+# Helper to classify spread quality based only on standard deviation magnitude
+# Thresholds are heuristic; adjust if domain knowledge suggests different cutoffs.
+# Units are the same as deposition intensity units.
+def _classify_spread_std(std_val: float):
+    if std_val < 0.05:
+        return "🟢 Excellent (Very even) 😊", "Highly uniform spread."
+    if std_val < 0.15:
+        return "🟡 Good (Mostly even) 🙂", "Minor variation only."
+    if std_val < 0.30:
+        return "🟠 Fair (Some unevenness) ⚠️", "Consider reducing stride, adding passes or raising Z height."
+    return "🔴 Poor (Uneven spread) ❗", "Reduce stride or adjust settings to improve uniformity."
 
 logger = get_logger("MALDI.WebApp.Simulation")
 
@@ -70,10 +84,26 @@ if st.session_state.best_strides is not None:
             fig = ms.visualize_optimized_samples(st.session_state.best_strides)
             st.pyplot(fig)
             plt.close(fig)
-            # Add standard deviation metric
+            # Per-sample standard deviation metrics + interpretation (use existing API)
             if ms.bed_mesh is not None:
-                std_devs = ms.bed_mesh.get_std_deviation(overall_dev=True)
-                st.metric("Deposition Standard Deviation", f"{std_devs[0]:.3f}")
+                std_list = ms.bed_mesh.get_std_deviation(overall_dev=False)
+                if std_list:
+                    st.subheader("📐 Spread Quality Per Sample")
+                    cols = st.columns(len(std_list))
+                    for idx, (col, std_val) in enumerate(zip(cols, std_list)):
+                        with col:
+                            quality, advice = _classify_spread_std(std_val)
+                            st.metric(f"Sample {idx+1} Std Dev", f"{std_val:.4f}")
+                            st.caption(quality)
+                    # Detailed messages below
+                    for idx, std_val in enumerate(std_list):
+                        quality, advice = _classify_spread_std(std_val)
+                        msg = (f"Sample {idx+1}: {quality}\nStd Dev = {std_val:.4f}\n"
+                               f"Goal: lower Std Dev = more EVEN spread. {advice}")
+                        if "Poor" in quality or "Fair" in quality:
+                            st.warning(msg)
+                        else:
+                            st.info(msg)
         except Exception as e:
             st.error(f"❌ Error generating visualization: {e}")
 
@@ -107,6 +137,24 @@ with col1:
                     with col2:
                         st.pyplot(fig)
                         plt.close(fig)
+                        if ms.bed_mesh is not None:
+                            std_list = ms.bed_mesh.get_std_deviation(overall_dev=False)
+                            if std_list:
+                                st.subheader("📐 Spread Quality Per Sample")
+                                cols = st.columns(len(std_list))
+                                for idx, (col, std_val) in enumerate(zip(cols, std_list)):
+                                    with col:
+                                        quality, advice = _classify_spread_std(std_val)
+                                        st.metric(f"Sample {idx+1} Std Dev", f"{std_val:.4f}")
+                                        st.caption(quality)
+                            for idx, std_val in enumerate(std_list):
+                                quality, advice = _classify_spread_std(std_val)
+                                msg = (f"Sample {idx+1}: {quality}\nStd Dev = {std_val:.4f}\n"
+                                       f"Goal: lower Std Dev = more EVEN spread. {advice}")
+                                if "Poor" in quality or "Fair" in quality:
+                                    st.warning(msg)
+                                else:
+                                    st.info(msg)
                 else:
                     logger.warning("Manual simulation returned None figure")
                     st.error("❌ Simulation failed.")
